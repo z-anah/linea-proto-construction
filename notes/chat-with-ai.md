@@ -10,6 +10,13 @@ Bottom
 
 ---
 
+[
+  { "step": 1, "title": "Read email and attachments", "description": "Read entire email contents..." },
+  { "step": 2, "title": "Gather information", "description": "Gather project address and invoice number..." }
+]
+
+---
+
 # Data Entry
 ## Read email and attachments
 Team members (multiple emails)
