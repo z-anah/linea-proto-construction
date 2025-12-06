@@ -1,7 +1,8 @@
 <script setup>
+import { watch, toRef } from 'vue'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
-import { VueFlow } from '@vue-flow/core'
+import { VueFlow, useVueFlow } from '@vue-flow/core'
 
 const props = defineProps({
   nodes: Array,
@@ -11,6 +12,39 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:nodes', 'update:edges', 'node-click', 'canvas-click'])
+
+const { setNodes, setEdges, onNodesChange, onEdgesChange } = useVueFlow()
+
+// Watch for external node changes and sync with Vue Flow
+watch(
+  () => props.nodes,
+  (newNodes) => {
+    if (newNodes) {
+      setNodes(newNodes)
+    }
+  },
+  { deep: true, immediate: true }
+)
+
+// Watch for external edge changes and sync with Vue Flow
+watch(
+  () => props.edges,
+  (newEdges) => {
+    if (newEdges) {
+      setEdges(newEdges)
+    }
+  },
+  { deep: true, immediate: true }
+)
+
+// Emit changes back to parent
+onNodesChange((changes) => {
+  emit('update:nodes', props.nodes)
+})
+
+onEdgesChange((changes) => {
+  emit('update:edges', props.edges)
+})
 
 function handleNodeClick(event) {
   emit('node-click', event)
@@ -24,8 +58,6 @@ function handlePaneClick(event) {
 <template>
   <div class="canvas-container">
     <VueFlow
-      v-model:nodes="props.nodes"
-      v-model:edges="props.edges"
       :node-types="props.nodeTypes"
       class="lindy-canvas"
       fit-view-on-init

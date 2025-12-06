@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, triggerRef } from 'vue'
 
 // Configuration for automatic layout
 const LAYOUT_CONFIG = {
@@ -63,13 +63,13 @@ export default function useNodes() {
 
   // Add a new node with automatic positioning and connection
   const addNode = (nodeData) => {
-    const newId = (Math.max(...nodes.value.map(n => parseInt(n.id))) + 1).toString()
+    const newId = (Math.max(0, ...nodes.value.map(n => parseInt(n.id))) + 1).toString()
     const position = getNextPosition()
     
     const newNode = {
       id: newId,
       type: 'lindyNode',
-      position,
+      position: { ...position },
       data: {
         step: nodes.value.length + 1,
         title: nodeData.title || 'New Step',
@@ -77,18 +77,20 @@ export default function useNodes() {
       }
     }
     
-    nodes.value.push(newNode)
+    // Create new array to ensure reactivity
+    const newNodes = [...nodes.value, newNode]
+    nodes.value = newNodes
     
     // Auto-connect to previous node if it exists
-    if (nodes.value.length > 1) {
-      const previousNodeId = nodes.value[nodes.value.length - 2].id
+    if (newNodes.length > 1) {
+      const previousNodeId = newNodes[newNodes.length - 2].id
       const newEdge = {
         id: `e${previousNodeId}-${newId}`,
         source: previousNodeId,
         target: newId,
         type: 'default'
       }
-      edges.value.push(newEdge)
+      edges.value = [...edges.value, newEdge]
     }
     
     return newNode
@@ -96,9 +98,15 @@ export default function useNodes() {
 
   // Update node data
   const updateNode = (nodeId, updates) => {
-    const node = getNodeById(nodeId)
-    if (node) {
-      Object.assign(node.data, updates)
+    const nodeIndex = nodes.value.findIndex(node => node.id === nodeId)
+    if (nodeIndex !== -1) {
+      const updatedNode = {
+        ...nodes.value[nodeIndex],
+        data: { ...nodes.value[nodeIndex].data, ...updates }
+      }
+      const newNodes = [...nodes.value]
+      newNodes[nodeIndex] = updatedNode
+      nodes.value = newNodes
     }
   }
 
@@ -107,35 +115,37 @@ export default function useNodes() {
     const nodeIndex = nodes.value.findIndex(node => node.id === nodeId)
     if (nodeIndex === -1) return
     
-    // Remove the node
-    nodes.value.splice(nodeIndex, 1)
-    
-    // Remove edges connected to this node
-    edges.value = edges.value.filter(edge => 
-      edge.source !== nodeId && edge.target !== nodeId
-    )
+    // Filter out the node
+    let newNodes = nodes.value.filter(node => node.id !== nodeId)
     
     // Renumber steps and reposition remaining nodes
-    nodes.value.forEach((node, index) => {
-      node.data.step = index + 1
-      node.position = {
+    newNodes = newNodes.map((node, index) => ({
+      ...node,
+      position: {
         x: LAYOUT_CONFIG.startX,
         y: LAYOUT_CONFIG.startY + (index * LAYOUT_CONFIG.nodeSpacing)
+      },
+      data: {
+        ...node.data,
+        step: index + 1
       }
-    })
+    }))
+    
+    nodes.value = newNodes
     
     // Recreate edges for linear connection
-    edges.value = []
-    for (let i = 0; i < nodes.value.length - 1; i++) {
-      const sourceId = nodes.value[i].id
-      const targetId = nodes.value[i + 1].id
-      edges.value.push({
+    const newEdges = []
+    for (let i = 0; i < newNodes.length - 1; i++) {
+      const sourceId = newNodes[i].id
+      const targetId = newNodes[i + 1].id
+      newEdges.push({
         id: `e${sourceId}-${targetId}`,
         source: sourceId,
         target: targetId,
         type: 'default'
       })
     }
+    edges.value = newEdges
   }
 
   return {
